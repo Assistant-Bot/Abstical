@@ -68,7 +68,7 @@ export default class Client extends EventEmitter {
 		this.emit('response', response);
 	}
 
-	public async send(op: string | number, d?: any): Promise<AbsticalResponse | boolean> {
+	public async send(op: string | number, d?: any): Promise<AbsticalResponse> {
 		if (Object.keys(this.#opMap).length === 0) {
 			await this.waitForOpMap();
 		}
@@ -87,13 +87,12 @@ export default class Client extends EventEmitter {
 				if (res.id === payload.id) {
 					this.removeListener('response', lstnr);
 					resolve(res);
-				} else {
-					if (start + 10000 < Date.now()) {
-						this.removeListener('response', lstnr);
-						resolve(false);
-					}
 				}
 			}
+			setTimeout(() => {
+				this.removeListener('response', lstnr);
+				resolve(AbsticalResponse.timedOut(payload));
+			}, 10000);
 			this.on("response", lstnr);
 		})
 	}
