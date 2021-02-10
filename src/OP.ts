@@ -22,8 +22,18 @@ export enum ReservedOp {
 	OP_MAP
 }
 
+export interface OpMap {
+	[k: number]: {
+		name: string;
+		op: number;
+		reserved: boolean;
+		accepts?: any;
+	}
+}
+
 export interface OpPayload {
 	op: number;
 	d?: any;
 	t?: string;
+	id: string;
 }

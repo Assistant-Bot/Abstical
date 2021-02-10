@@ -20,14 +20,15 @@ import Server from "./Server.ts";
 export default class Request {
 	public readonly oPay: OpPayload;
 	public readonly op: number;
-	[key: string]: any;
+	public connection: Connection;
 	#_responded: boolean;
 	#server: Server;
-	#connection: Connection;
+	// This is not cool but ignore it.
+	[key: string]: any;
 
 	public constructor(server: Server, conn: Connection, payload: OpPayload) {
 		this.#server = server;
-		this.#connection = conn;
+		this.connection = conn;
 		this.#_responded = false;
 		this.oPay = payload;
 		this.op = payload.op;
@@ -62,13 +63,17 @@ export default class Request {
 			this.#_responded = true;
 		}
 		if (d) {
-			return this.#connection.send(opOrd, d);
+			return this.connection.send(opOrd, d, this.oPay.id);
 		} else {
-			return this.#connection.send(this.oPay.op, d);
+			return this.connection.send(this.oPay.op, d, this.oPay.id);
 		}
 	}
 
 	public get responded(): boolean {
 		return !!this.#_responded;
+	}
+
+	public get requestId(): string {
+		return this.oPay.id;
 	}
 }

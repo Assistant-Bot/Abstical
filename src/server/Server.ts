@@ -13,7 +13,7 @@
  * as published by the Free Software Foundation; either version 3
  * of the License, or (at your option) any later version.
  */
-import { EventEmitter, GenericFunction, WrappedFunction } from 'https://deno.land/std@0.85.0/node/events.ts';
+import { EventEmitter } from 'https://deno.land/std@0.85.0/node/events.ts';
 import { serve, Server as HTTPServer } from "https://deno.land/std@0.85.0/http/server.ts";
 import { acceptWebSocket, WebSocket } from "https://deno.land/std@0.85.0/ws/mod.ts";
 import { OpPayload, ReservedOp } from "../OP.ts";

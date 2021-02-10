@@ -14,6 +14,7 @@
  * of the License, or (at your option) any later version.
  */
 import { isWebSocketCloseEvent, OpCode, WebSocket } from "https://deno.land/std@0.85.0/ws/mod.ts";
+import { v4 } from "https://deno.land/std@0.86.0/uuid/mod.ts";
 import { OpPayload, ReservedOp } from "../OP.ts";
 import AbsticalRequest from "./Request.ts";
 import Server from "./Server.ts";
@@ -39,6 +40,7 @@ export default class Connection {
 		this.#server = server;
 		this.#connectedSince = Date.now();
 		this.task = setInterval(this.tick, this.heartInterval, this);
+		this.send(ReservedOp.HEARTBEAT, { interval: this.heartInterval });
 		this.send(ReservedOp.OP_MAP, this.#server.generateOpMap());
 		this.handleWs();
 	}
@@ -48,6 +50,10 @@ export default class Connection {
 			for await (const message of this.ws) {
 				if (message instanceof Uint8Array) {
 					const payload = JSON.parse(new TextDecoder().decode(message));
+					if (!payload.op || !payload.id) {
+						this.send(ReservedOp.BAD_REQUEST, { id: payload.id || v4.generate(), payload: payload })
+						continue;
+					}
 					this.#server.emit('message', new AbsticalRequest(this.#server, this, payload));
 				} else if (isWebSocketCloseEvent(message)) {
 					const { code, reason } = message;
@@ -58,14 +64,15 @@ export default class Connection {
 		} catch {}
 	}
 
-	public send(opName: string | number, data?: any) {
+	public send(opName: string | number, data?: any, id?: string) {
 		if (!this.#server.hasAnyOp(opName)) {
 			return;
 		} else {
 			const _num = this.#server.getAnyOp(opName) as [number, Function] | number;
 			const op: number = _num instanceof Array ? _num[0] : _num;
 			const payload: OpPayload = {
-				op
+				op,
+				id: id ? id : v4.generate()
 			};
 			if (data) {
 				payload.d = data;
