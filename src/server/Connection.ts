@@ -63,7 +63,7 @@ export default class Connection {
 				this.#server.emit('message', new AbsticalRequest(this.#server, this, payload));
 			} else if (isWebSocketCloseEvent(message)) {
 				const { code, reason } = message;
-				this.close();
+				this.close(true);
 				return;
 			}
 		}
@@ -90,10 +90,14 @@ export default class Connection {
 		}
 	}
 
-	public close(): void {
+	public close(doNotClose: boolean = false): void {
 		this.#server.emit('close', this);
 		clearInterval(this.task);
-		this.ws.close();
+		if (!doNotClose) {
+			try {
+				this.ws.close();
+			} catch {}
+		}
 		this.#server.connections.delete(this.ip + ':' + this.port);
 	}
 
