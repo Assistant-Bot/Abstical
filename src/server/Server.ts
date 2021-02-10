@@ -33,6 +33,7 @@ export default class Server extends EventEmitter {
 
 	public constructor(opMap: Map<string, number> = new Map()) {
 		super();
+		super.setMaxListeners(0);
 		this.connections = new Map();
 		this.#opMap = opMap;
 		this.validateOpMap();

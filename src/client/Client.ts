@@ -24,6 +24,11 @@ export default class Client extends EventEmitter {
 	#opMap: OpMap = {};
 	#requestPool: Map<string, any> = new Map();
 
+	public constructor() {
+		super();
+		super.setMaxListeners(0);
+	}
+
 	public async connect(address: string) {
 		this.#ws = new WebSocket(address);
 		this.#ws.onmessage = this.wsMessage.bind(this);
