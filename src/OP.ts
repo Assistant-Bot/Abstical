@@ -14,7 +14,16 @@
  * to remove this software from your device immediately.
  */
 export enum ReservedOp {
-	HEARTBEAT = -2,
+	RECIEVER_INFO = -5, // only used if proxied
+	DISCONNECT,
+	HEARTBEAT,
 	HEARTBEAT_ACK,
+	BAD_REQUEST,
 	OP_MAP
+}
+
+export interface OpPayload {
+	op: number;
+	d?: any;
+	t?: string;
 }

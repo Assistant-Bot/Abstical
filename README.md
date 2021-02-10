@@ -1,5 +1,5 @@
 # Abstical
-A basic server websocket api implementation.
+A basic server websocket api implementation designed to be proxied.
 
 ## Api
 The api is designed to be simple and elegant to use.
