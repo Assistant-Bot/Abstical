@@ -65,7 +65,7 @@ export default class Request {
 		if (d) {
 			return this.connection.send(opOrd, d, this.oPay.id);
 		} else {
-			return this.connection.send(this.oPay.op, d, this.oPay.id);
+			return this.connection.send(this.oPay.op, opOrd, this.oPay.id);
 		}
 	}
 

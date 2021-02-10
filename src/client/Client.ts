@@ -24,13 +24,24 @@ export default class Client extends EventEmitter {
 	#opMap: OpMap = {};
 	#requestPool: Map<string, any> = new Map();
 
-	public connect(address: string) {
+	public async connect(address: string) {
 		this.#ws = new WebSocket(address);
 		this.#ws.onmessage = this.wsMessage.bind(this);
 		this.#ws.onerror = this.wsError.bind(this);
 		this.#ws.onclose = async () => {
 			clearInterval(this.#heartAck);
 		}
+		this.#ws.onopen = () => {
+			this.emit('open');
+		}
+		// returns when connected
+		return new Promise((res, rej) => {
+			let lstnr = () => {
+				this.removeListener('open', lstnr);
+				res(Date.now());
+			}
+			this.on("open", lstnr);
+		})
 	}
 
 	private wsError(err: Event | ErrorEvent) {
@@ -39,21 +50,16 @@ export default class Client extends EventEmitter {
 
 	private wsMessage(ev: MessageEvent) {
 		const payload: OpPayload = JSON.parse(ev.data);
-
 		if (payload.op === ReservedOp.OP_MAP) {
-			this.#opMap = this.#opMap;
+			this.#opMap = payload.d;
+			this.emit("opmap");
+			return;
 		}
 
 		if (payload.op === ReservedOp.HEARTBEAT) {
 			this.#heartAck = setInterval(() => {
 				this.send(ReservedOp.HEARTBEAT, { interval: payload.d?.interval });
 			}, payload.d?.interval);
-			return;
-		}
-
-		if (payload.op === ReservedOp.HEARTBEAT_ACK) {
-			// server still alive, we can ignore this
-			return;
 		}
 
 		const request: any = this.#requestPool.get(payload.id) || { id: "unknown", op: ReservedOp.BAD_REQUEST };
@@ -62,7 +68,10 @@ export default class Client extends EventEmitter {
 		this.emit('response', response);
 	}
 
-	public send(op: string | number, d?: any): Promise<AbsticalResponse> {
+	public async send(op: string | number, d?: any): Promise<AbsticalResponse | boolean> {
+		if (Object.keys(this.#opMap).length === 0) {
+			await this.waitForOpMap();
+		}
 		const payload: OpPayload = {
 			id: v4.generate(),
 			d: d,
@@ -70,13 +79,39 @@ export default class Client extends EventEmitter {
 		};
 
 		this.#requestPool.set(payload.id, payload);
+		this.#ws.send(new TextEncoder().encode(JSON.stringify(payload)));
 
 		return new Promise((resolve, reject) => {
+			let start: number = Date.now();
 			let lstnr = (res: AbsticalResponse) => {
-				this.removeListener('response', lstnr);
-				resolve(res);
+				if (res.id === payload.id) {
+					this.removeListener('response', lstnr);
+					resolve(res);
+				} else {
+					if (start + 10000 < Date.now()) {
+						this.removeListener('response', lstnr);
+						resolve(false);
+					}
+				}
 			}
 			this.on("response", lstnr);
+		})
+	}
+
+	public async close(): Promise<void> {
+		this.send(ReservedOp.DISCONNECT);
+		this.#ws.close();
+	}
+
+	private waitForOpMap(): Promise<boolean> {
+		// this times out after 10 seconds
+		return new Promise((resolve, reject) => {
+			let tm = setTimeout(() => {reject(false)}, 10000);
+			let lstnr = () => {
+				clearTimeout(tm);
+				resolve(true);
+			};
+			this.on("opmap", lstnr);
 		})
 	}
 

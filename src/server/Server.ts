@@ -97,7 +97,7 @@ export default class Server extends EventEmitter {
 	}
 
 	public hasOp(op: number): boolean {
-		return [...this.#opMap.values()].includes(op);
+		return [...this.#opMap.values()].map(v => (v instanceof Array) ? v[0] : v).includes(op);
 	}
 
 	public hasAnyOp(op: string | number): boolean {
@@ -113,7 +113,7 @@ export default class Server extends EventEmitter {
 		let opsMap: any = {};
 		for (let [k, v] of this.#opMap) {
 			let resolvedNum: number = v instanceof Array ? v[0] : v;
-			opsMap[resolvedNum] = {
+			opsMap[k] = {
 				name: k,
 				op: resolvedNum,
 				reserved: Object.values(ReservedOp).includes(resolvedNum)
@@ -150,7 +150,7 @@ export default class Server extends EventEmitter {
 				);
 			} else {
 				// @ts-ignore
-				this.registerOp(Object.keys(ReservedOp).find((k: string) => ReservedOp[k] === op) || 'UNKNOWN_OP', op);
+				this.registerOp(Object.keys(ReservedOp).filter((k: string) => !parseInt(k)).find((k: string) => ReservedOp[k] === op) || 'UNKNOWN_OP', op);
 			}
 		}
 	}
@@ -177,7 +177,7 @@ export default class Server extends EventEmitter {
 	}
 
 	async *[Symbol.asyncIterator](): AsyncGenerator<AbsticalRequest> {
-		while (!this.#ws.isClosed) {
+		while(!this.#ws.isClosed) {
 			yield this.awaitRequest();
 		}
 	}

@@ -22,7 +22,7 @@ import Server from "./Server.ts";
 export default class Connection {
 	public readonly ip: string;
 	public readonly port: number;
-	public readonly ws: WebSocket;
+	public ws: WebSocket;
 	public lastMessage: number;
 	public lastHeartBeat: number;
 	public heartInterval: number;
@@ -39,29 +39,34 @@ export default class Connection {
 		this.lastHeartBeat = Date.now();
 		this.#server = server;
 		this.#connectedSince = Date.now();
+		this.handleWs();
 		this.task = setInterval(this.tick, this.heartInterval, this);
 		this.send(ReservedOp.HEARTBEAT, { interval: this.heartInterval });
 		this.send(ReservedOp.OP_MAP, this.#server.generateOpMap());
-		this.handleWs();
 	}
 
 	private async handleWs() {
-		try {
-			for await (const message of this.ws) {
-				if (message instanceof Uint8Array) {
-					const payload = JSON.parse(new TextDecoder().decode(message));
-					if (!payload.op || !payload.id) {
-						this.send(ReservedOp.BAD_REQUEST, { id: payload.id || v4.generate(), payload: payload })
-						continue;
-					}
-					this.#server.emit('message', new AbsticalRequest(this.#server, this, payload));
-				} else if (isWebSocketCloseEvent(message)) {
-					const { code, reason } = message;
-					this.#server.emit('close', this);
+		for await (const message of this.ws) {
+			if (message instanceof Uint8Array) {
+				const payload = JSON.parse(new TextDecoder().decode(message));
+				if (!payload.op || !payload.id) {
+					this.send(ReservedOp.BAD_REQUEST, { id: payload.id || v4.generate(), payload: payload })
+					continue;
 				}
+
+				if (payload.op === ReservedOp.HEARTBEAT) {
+					if (payload.d.interval !== this.heartInterval) {
+						this.close();
+						return;
+					}
+				}
+				this.#server.emit('message', new AbsticalRequest(this.#server, this, payload));
+			} else if (isWebSocketCloseEvent(message)) {
+				const { code, reason } = message;
+				this.close();
+				return;
 			}
-			this.#server.connections.delete(this.ip + ':' + this.port);
-		} catch {}
+		}
 	}
 
 	public send(opName: string | number, data?: any, id?: string) {
@@ -85,13 +90,20 @@ export default class Connection {
 		}
 	}
 
+	public close(): void {
+		this.#server.emit('close', this);
+		clearInterval(this.task);
+		this.ws.close();
+		this.#server.connections.delete(this.ip + ':' + this.port);
+	}
+
 	private async tick(instance: this) {
-		this.send(ReservedOp.HEARTBEAT_ACK, { interval: this.heartInterval });
+		instance.send(ReservedOp.HEARTBEAT_ACK, { interval: this.heartInterval });
 
 		if (this.lastHeartBeat + this.heartInterval + 10000 < Date.now()) {
 			// timed out
-			this.#server.emit("timeout", this);
-			instance.ws.close();
+			instance.#server.emit("timeout", this);
+			instance.close();
 		}
 	}
 }
