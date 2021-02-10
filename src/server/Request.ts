@@ -19,14 +19,18 @@ import Server from "./Server.ts";
 
 export default class Request {
 	public readonly oPay: OpPayload;
+	public readonly op: number;
 	[key: string]: any;
+	#_responded: boolean;
 	#server: Server;
 	#connection: Connection;
 
 	public constructor(server: Server, conn: Connection, payload: OpPayload) {
 		this.#server = server;
 		this.#connection = conn;
+		this.#_responded = false;
 		this.oPay = payload;
+		this.op = payload.op;
 
 		if (!this.#server.hasOp(payload.op)) {
 			// bad request
@@ -40,11 +44,31 @@ export default class Request {
 		}
 	}
 
+	public is(op: string | number): boolean {
+		if (!this.#server.hasAnyOp(op)) {
+			return false;
+		}
+		let opr = this.#server.getAnyOp(op);
+		let absolute: number = opr instanceof Array
+			? opr[0]
+			: opr as number;
+		return this.oPay.op === absolute;
+	}
+
 	public respond(opOrd: any, d?: any) {
+		if (this.#_responded === true) {
+			throw new Error("Can not respond to a request twice");
+		} else {
+			this.#_responded = true;
+		}
 		if (d) {
 			return this.#connection.send(opOrd, d);
 		} else {
 			return this.#connection.send(this.oPay.op, d);
 		}
+	}
+
+	public get responded(): boolean {
+		return !!this.#_responded;
 	}
 }

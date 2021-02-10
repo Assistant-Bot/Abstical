@@ -15,6 +15,7 @@
  */
 import { isWebSocketCloseEvent, OpCode, WebSocket } from "https://deno.land/std@0.85.0/ws/mod.ts";
 import { OpPayload, ReservedOp } from "../OP.ts";
+import AbsticalRequest from "./Request.ts";
 import Server from "./Server.ts";
 
 export default class Connection {
@@ -46,7 +47,8 @@ export default class Connection {
 		try {
 			for await (const message of this.ws) {
 				if (message instanceof Uint8Array) {
-					this.#server.emit('message', this, JSON.parse(new TextDecoder().decode(message)));
+					const payload = JSON.parse(new TextDecoder().decode(message));
+					this.#server.emit('message', new AbsticalRequest(this.#server, this, payload));
 				} else if (isWebSocketCloseEvent(message)) {
 					const { code, reason } = message;
 					this.#server.emit('close', this);
@@ -82,6 +84,7 @@ export default class Connection {
 		if (this.lastHeartBeat + this.heartInterval + 10000 < Date.now()) {
 			// timed out
 			this.#server.emit("timeout", this);
+			instance.ws.close();
 		}
 	}
 }

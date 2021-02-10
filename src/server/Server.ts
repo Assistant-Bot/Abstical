@@ -18,12 +18,12 @@ import { serve, Server as HTTPServer } from "https://deno.land/std@0.85.0/http/s
 import { acceptWebSocket, WebSocket } from "https://deno.land/std@0.85.0/ws/mod.ts";
 import { OpPayload, ReservedOp } from "../OP.ts";
 import Connection from "./Connection.ts";
-import Request from "./Request.ts";
+import AbsticalRequest from "./Request.ts";
 
-export type ServerReciever = (connection: Connection, payload?: any) => any;
+export type ServerReciever = (request: AbsticalRequest) => any;
 export type ServerDispatch = (connection: Connection, payload: OpPayload) => any;
 export type ServerListener = ServerReciever | ServerDispatch;
-export type ServerEvent = "close" | "timeout" | "message" | "send";
+export type ServerEvent = "close" | "timeout" | "request" | "send";
 
 export default class Server extends EventEmitter {
 	public connections: Map<string, Connection>;
@@ -36,6 +36,14 @@ export default class Server extends EventEmitter {
 		this.connections = new Map();
 		this.#opMap = opMap;
 		this.validateOpMap();
+		super.on('message', (req: AbsticalRequest) => {
+			let handler = this.getOpBC(req.op);
+			if (handler instanceof Array) {
+				handler[1](req);
+			} else {
+				this.emit('request', req);
+			}
+		});
 	}
 
 	public registerOp(name: string, number: number, fn?: Function): boolean {
@@ -168,16 +176,15 @@ export default class Server extends EventEmitter {
 		return super.emit(ev, ...args);
 	}
 
-	async *[Symbol.asyncIterator](): AsyncGenerator<Request> {
+	async *[Symbol.asyncIterator](): AsyncGenerator<AbsticalRequest> {
 		while (!this.#ws.isClosed) {
 			yield this.awaitRequest();
 		}
 	}
 
-	private async awaitRequest(): Promise<Request> {
+	private async awaitRequest(): Promise<AbsticalRequest> {
 		return new Promise((resolve, reject) => {
-			this.once('message', (conn: Connection, payload: any) => {
-				const req = new Request(this, conn, payload);
+			this.once('request', (req: AbsticalRequest) => {
 				resolve(req);
 			});
 		});
