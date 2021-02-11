@@ -2,7 +2,7 @@ import * as Abstical from '../mod.ts';
 
 const server = new Abstical.Server();
 
-server.registerOp("test", 1, (req: Abstical.Request) => {
+server.registerOp("add", 1, (req: Abstical.Request) => {
 	req.respond({ result: req.x + req.y });
 });
 
